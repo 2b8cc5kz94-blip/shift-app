@@ -56,7 +56,6 @@
             background-color: var(--bg-dark);
             color: var(--text-light);
             padding-bottom: 120px;
-            /* 上部セーフエリア対応も含め、上方向のズレを解消 */
             padding-top: env(safe-area-inset-top);
         }
 
@@ -647,6 +646,13 @@
             renderAll();
         }
 
+        function handleDateFocus(inputElement) {
+            // 未選択時にカレンダーを開いた際、表示中の「月」の1日を初期フォーカスに設定（自動決定は防ぐ）
+            if (!inputElement.value && currentYM) {
+                inputElement.value = `${currentYM}-01`;
+            }
+        }
+
         function updateValue(idx, field, val, element) {
             shifts[idx][field] = val;
             saveToStorage();
@@ -660,7 +666,7 @@
                 } else {
                     dummyBtn.textContent = "選択してください";
                     dummyBtn.className = "date-dummy-btn empty";
-                    element.value = ""; // 空のときはnative inputも強制的に空に戻す
+                    element.value = "";
                 }
                 
                 const card = element.closest('.shift-card');
@@ -746,7 +752,7 @@
                             <label class="field-label">勤務日</label>
                             <div class="date-picker-box">
                                 <div class="${dateBtnClass}">${dateBtnText}</div>
-                                <input type="date" class="date-native-input" value="${shift.date || ''}" oninput="updateValue(${idx}, 'date', this.value, this); this.blur();" onchange="updateValue(${idx}, 'date', this.value, this); this.blur();">
+                                <input type="date" class="date-native-input" value="${shift.date || ''}" onfocus="handleDateFocus(this)" onchange="updateValue(${idx}, 'date', this.value, this); this.blur();">
                             </div>
                         </div>
 
@@ -757,20 +763,20 @@
                             </div>
                             <div class="time-select-grid">
                                 <div class="time-box">
-                                    <select oninput="updateValue(${idx}, 'startH', this.value, this); this.blur();" onchange="updateValue(${idx}, 'startH', this.value, this); this.blur();">${genOptions(23, shift.startH)}</select>
+                                    <select onchange="updateValue(${idx}, 'startH', this.value, this); this.blur();">${genOptions(23, shift.startH)}</select>
                                     <span>時</span>
                                 </div>
                                 <div class="time-box">
-                                    <select oninput="updateValue(${idx}, 'startM', this.value, this); this.blur();" onchange="updateValue(${idx}, 'startM', this.value, this); this.blur();">${genOptions(55, shift.startM, 5)}</select>
+                                    <select onchange="updateValue(${idx}, 'startM', this.value, this); this.blur();">${genOptions(55, shift.startM, 5)}</select>
                                     <span>分</span>
                                 </div>
                                 <span class="time-sep">〜</span>
                                 <div class="time-box">
-                                    <select oninput="updateValue(${idx}, 'endH', this.value, this); this.blur();" onchange="updateValue(${idx}, 'endH', this.value, this); this.blur();">${genOptions(23, shift.endH)}</select>
+                                    <select onchange="updateValue(${idx}, 'endH', this.value, this); this.blur();">${genOptions(23, shift.endH)}</select>
                                     <span>時</span>
                                 </div>
                                 <div class="time-box">
-                                    <select oninput="updateValue(${idx}, 'endM', this.value, this); this.blur();" onchange="updateValue(${idx}, 'endM', this.value, this); this.blur();">${genOptions(55, shift.endM, 5)}</select>
+                                    <select onchange="updateValue(${idx}, 'endM', this.value, this); this.blur();">${genOptions(55, shift.endM, 5)}</select>
                                     <span>分</span>
                                 </div>
                             </div>
