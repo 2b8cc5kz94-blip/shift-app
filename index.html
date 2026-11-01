@@ -171,6 +171,7 @@
             color: var(--text-muted);
         }
 
+        /* シフトカード共通スタイル */
         .shift-card {
             background-color: var(--card-bg);
             color: var(--card-text);
@@ -178,6 +179,19 @@
             padding: 16px;
             margin-bottom: 16px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        /* 未入力時のカード（少し未完了感を出すため枠を赤み・オレンジ系等にしないまでもデフォルト） */
+        .shift-card.incomplete {
+            border-color: #cbd5e1;
+        }
+
+        /* 入力完了時のカード（緑色の枠と背景の微小な変化で「入力済み」を可視化） */
+        .shift-card.completed {
+            border-color: var(--accent-green);
+            background-color: #f0fdf4;
         }
 
         .card-top {
@@ -769,7 +783,6 @@
             renderAll();
         }
 
-        // --- 自作カレンダーの制御 ---
         function openCalendar(idx) {
             activeShiftIdx = idx;
             const currentVal = shifts[idx].date;
@@ -810,14 +823,12 @@
             const lastDate = new Date(calYear, calMonth, 0).getDate();
             const holidays = getHolidaysOfYear(calYear);
 
-            // 空白セル
             for (let i = 0; i < firstDayIndex; i++) {
                 const cell = document.createElement('div');
                 cell.className = 'cal-day empty';
                 grid.appendChild(cell);
             }
 
-            // 日付セル
             for (let d = 1; d <= lastDate; d++) {
                 const mStr = String(calMonth).padStart(2, '0');
                 const dStr = String(d).padStart(2, '0');
@@ -861,6 +872,20 @@
             saveToStorage();
             updateCardSubtotal(idx);
             updateSummary();
+            // 入力状態の変化に伴いカード全体の見た目（色）も更新
+            updateCardStyle(idx);
+        }
+
+        function updateCardStyle(idx) {
+            const container = document.getElementById('shiftContainer');
+            const card = container.children[idx];
+            if (!card) return;
+            const shift = shifts[idx];
+            if (shift.date) {
+                card.className = 'shift-card completed';
+            } else {
+                card.className = 'shift-card incomplete';
+            }
         }
 
         function updateCardSubtotal(idx) {
@@ -915,8 +940,11 @@
                         dateBtnClass = "date-dummy-btn";
                     }
 
+                    // 入力済み（日付あり）なら completed、未入力なら incomplete クラスを付与
+                    const cardClass = shift.date ? 'shift-card completed' : 'shift-card incomplete';
+
                     const card = document.createElement('div');
-                    card.className = 'shift-card';
+                    card.className = cardClass;
                     card.innerHTML = `
                         <div class="card-top">
                             <div>
