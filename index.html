@@ -171,7 +171,6 @@
             color: var(--text-muted);
         }
 
-        /* シフトカード共通スタイル */
         .shift-card {
             background-color: var(--card-bg);
             color: var(--card-text);
@@ -183,12 +182,10 @@
             transition: all 0.2s ease;
         }
 
-        /* 未入力時のカード（少し未完了感を出すため枠を赤み・オレンジ系等にしないまでもデフォルト） */
         .shift-card.incomplete {
             border-color: #cbd5e1;
         }
 
-        /* 入力完了時のカード（緑色の枠と背景の微小な変化で「入力済み」を可視化） */
         .shift-card.completed {
             border-color: var(--accent-green);
             background-color: #f0fdf4;
@@ -299,6 +296,30 @@
         .time-sep {
             color: #64748b;
             padding: 0 2px;
+        }
+
+        /* 休憩時間用ボタン selector */
+        .break-btn-group {
+            display: flex;
+            gap: 6px;
+        }
+        .break-btn {
+            flex: 1;
+            padding: 8px 0;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background-color: #f8fafc;
+            color: #64748b;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.15s ease;
+        }
+        .break-btn.active {
+            background-color: var(--accent-blue);
+            color: #ffffff;
+            border-color: var(--accent-blue);
         }
 
         .card-subtotal {
@@ -453,8 +474,8 @@
             color: var(--text-muted);
             margin-bottom: 8px;
         }
-        .cal-weekdays div:first-child { color: #f87171; } /* 日曜 */
-        .cal-weekdays div:last-child { color: #60a5fa; }  /* 土曜 */
+        .cal-weekdays div:first-child { color: #f87171; }
+        .cal-weekdays div:last-child { color: #60a5fa; }
 
         .cal-grid {
             display: grid;
@@ -560,6 +581,7 @@
             <div class="guide-body" id="guideContent">
                 ・平日：8:00〜9:00（1,350円） / 9:00〜17:00（1,080円） / 17:00以降（1,350円）<br>
                 ・土日祝：全時間帯一律 1,350円<br>
+                ・休憩時間控除：45分選択で810円引 / 1時間選択で1,080円引<br>
                 ・時間帯を跨ぐシフトは自動分割されて計算されます。
             </div>
         </div>
@@ -652,7 +674,8 @@
             return { label: dayName, badge: '平日', category: 'weekday' };
         }
 
-        function calcSalary(dateStr, startH, startM, endH, endM) {
+        // 給与と実労働時間の計算（休憩控除対応）
+        function calcSalary(dateStr, startH, startM, endH, endM, breakTime) {
             if (!dateStr || startH === "" || startM === "" || endH === "" || endM === "") {
                 return { salary: 0, minutes: 0 };
             }
@@ -660,19 +683,35 @@
             const endTotal = Number(endH) * 60 + Number(endM);
             if (endTotal <= startTotal) return { salary: 0, minutes: 0 };
 
-            const totalMinutes = endTotal - startTotal;
+            const rawMinutes = endTotal - startTotal;
             const info = getDayInfo(dateStr);
 
-            if (info.category === 'weekend') {
-                return { salary: Math.round((totalMinutes / 60) * 1350), minutes: totalMinutes };
+            // 休憩時間の定義
+            let breakMinutes = 0;
+            let breakDeduction = 0;
+            if (breakTime === "45") {
+                breakMinutes = 45;
+                breakDeduction = 810;
+            } else if (breakTime === "60") {
+                breakMinutes = 60;
+                breakDeduction = 1080;
             }
 
-            let salary = 0;
-            for (let m = startTotal; m < endTotal; m += 5) {
-                let rate = (m >= 540 && m < 1020) ? 1080 : 1350;
-                salary += (rate / 60) * 5;
+            const netMinutes = Math.max(0, rawMinutes - breakMinutes);
+            let rawSalary = 0;
+
+            if (info.category === 'weekend') {
+                rawSalary = Math.round((rawMinutes / 60) * 1350);
+            } else {
+                for (let m = startTotal; m < endTotal; m += 5) {
+                    let rate = (m >= 540 && m < 1020) ? 1080 : 1350;
+                    rawSalary += (rate / 60) * 5;
+                }
+                rawSalary = Math.round(rawSalary);
             }
-            return { salary: Math.round(salary), minutes: totalMinutes };
+
+            const finalSalary = Math.max(0, rawSalary - breakDeduction);
+            return { salary: finalSalary, minutes: netMinutes };
         }
 
         let currentYM = "";
@@ -771,7 +810,8 @@
             shifts.push({
                 date: "",
                 startH: "", startM: "",
-                endH: "", endM: ""
+                endH: "", endM: "",
+                breakTime: "0" // デフォルト: なし
             });
             saveToStorage();
             renderAll();
@@ -867,12 +907,32 @@
             activeShiftIdx = null;
         }
 
+        function updateBreakTime(idx, breakVal) {
+            shifts[idx].breakTime = breakVal;
+            saveToStorage();
+
+            const container = document.getElementById('shiftContainer');
+            const card = container.children[idx];
+            if (card) {
+                const btns = card.querySelectorAll('.break-btn');
+                btns.forEach(btn => {
+                    if (btn.getAttribute('data-val') === breakVal) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+            }
+
+            updateCardSubtotal(idx);
+            updateSummary();
+        }
+
         function updateValue(idx, field, val, element) {
             shifts[idx][field] = val;
             saveToStorage();
             updateCardSubtotal(idx);
             updateSummary();
-            // 入力状態の変化に伴いカード全体の見た目（色）も更新
             updateCardStyle(idx);
         }
 
@@ -890,7 +950,7 @@
 
         function updateCardSubtotal(idx) {
             const shift = shifts[idx];
-            const res = calcSalary(shift.date, shift.startH, shift.startM, shift.endH, shift.endM);
+            const res = calcSalary(shift.date, shift.startH, shift.startM, shift.endH, shift.endM, shift.breakTime);
             const container = document.getElementById('shiftContainer');
             const card = container.children[idx];
             if (!card) return;
@@ -908,8 +968,8 @@
             let validCount = 0;
 
             shifts.forEach(shift => {
-                const res = calcSalary(shift.date, shift.startH, shift.startM, shift.endH, shift.endM);
-                if (res.minutes > 0) {
+                const res = calcSalary(shift.date, shift.startH, shift.startM, shift.endH, shift.endM, shift.breakTime);
+                if (res.minutes > 0 || res.salary > 0) {
                     totalSalary += res.salary;
                     totalMinutes += res.minutes;
                     validCount++;
@@ -930,7 +990,8 @@
             } else {
                 shifts.forEach((shift, idx) => {
                     const info = getDayInfo(shift.date);
-                    const res = calcSalary(shift.date, shift.startH, shift.startM, shift.endH, shift.endM);
+                    const bTime = shift.breakTime || "0";
+                    const res = calcSalary(shift.date, shift.startH, shift.startM, shift.endH, shift.endM, bTime);
 
                     let dateBtnText = "選択してください";
                     let dateBtnClass = "date-dummy-btn empty";
@@ -940,7 +1001,6 @@
                         dateBtnClass = "date-dummy-btn";
                     }
 
-                    // 入力済み（日付あり）なら completed、未入力なら incomplete クラスを付与
                     const cardClass = shift.date ? 'shift-card completed' : 'shift-card incomplete';
 
                     const card = document.createElement('div');
@@ -985,6 +1045,15 @@
                                     <select onchange="updateValue(${idx}, 'endM', this.value, this); this.blur();">${genOptions(55, shift.endM, 5)}</select>
                                     <span>分</span>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="field-group">
+                            <label class="field-label">休憩時間</label>
+                            <div class="break-btn-group">
+                                <button class="break-btn ${bTime === '0' ? 'active' : ''}" data-val="0" onclick="updateBreakTime(${idx}, '0')">なし</button>
+                                <button class="break-btn ${bTime === '45' ? 'active' : ''}" data-val="45" onclick="updateBreakTime(${idx}, '45')">45分</button>
+                                <button class="break-btn ${bTime === '60' ? 'active' : ''}" data-val="60" onclick="updateBreakTime(${idx}, '60')">1時間</button>
                             </div>
                         </div>
 
