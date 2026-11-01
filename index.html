@@ -40,8 +40,6 @@
             --accent-blue: #0284c7;
             --danger-red: #ef4444;
             --border-color: #273549;
-            --badge-bg: #fef08a;
-            --badge-text: #854d0e;
         }
 
         * {
@@ -231,11 +229,6 @@
             display: block;
         }
 
-        .date-picker-box {
-            position: relative;
-            width: 100%;
-        }
-
         .date-dummy-btn {
             width: 100%;
             padding: 12px;
@@ -246,21 +239,12 @@
             border-radius: 10px;
             background-color: #f8fafc;
             color: #0f172a;
+            cursor: pointer;
         }
 
         .date-dummy-btn.empty {
             color: #94a3b8;
             font-weight: 400;
-        }
-
-        .date-native-input {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            cursor: pointer;
         }
 
         .time-select-grid {
@@ -397,6 +381,120 @@
             padding: 32px 0;
             font-size: 14px;
         }
+
+        /* 自作カレンダーモーダル */
+        .cal-modal-bg {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+        .cal-modal-bg.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .cal-modal-box {
+            background-color: #1e293b;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            width: 90%;
+            max-width: 360px;
+            padding: 20px;
+            color: #ffffff;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .cal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .cal-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #38bdf8;
+        }
+        .cal-nav-btn {
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .cal-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .cal-weekdays div:first-child { color: #f87171; } /* 日曜 */
+        .cal-weekdays div:last-child { color: #60a5fa; }  /* 土曜 */
+
+        .cal-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-bottom: 20px;
+        }
+        .cal-day {
+            aspect-ratio: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            background-color: #0f172a;
+            color: #f8fafc;
+            user-select: none;
+        }
+        .cal-day.empty {
+            background: transparent;
+            cursor: default;
+        }
+        .cal-day.selected {
+            background-color: var(--accent-blue) !important;
+            color: #fff !important;
+        }
+        .cal-day.sun { color: #f87171; }
+        .cal-day.sat { color: #60a5fa; }
+        .cal-day.holiday { color: #facc15; }
+
+        .cal-footer {
+            display: flex;
+            gap: 10px;
+        }
+        .cal-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+            text-align: center;
+        }
+        .cal-btn-cancel {
+            background-color: #334155;
+            color: #94a3b8;
+        }
+        .cal-btn-ok {
+            background-color: var(--accent-blue);
+            color: #ffffff;
+        }
     </style>
 </head>
 <body>
@@ -455,6 +553,25 @@
 
     <div class="bottom-action-bar">
         <button class="btn-action btn-add" id="addBtn">＋ シフトを追加</button>
+    </div>
+
+    <!-- 自作カレンダーモーダル -->
+    <div class="cal-modal-bg" id="calModal">
+        <div class="cal-modal-box">
+            <div class="cal-header">
+                <button class="cal-nav-btn" onclick="changeCalMonth(-1)">‹</button>
+                <div class="cal-title" id="calTitle">2026年11月</div>
+                <button class="cal-nav-btn" onclick="changeCalMonth(1)">›</button>
+            </div>
+            <div class="cal-weekdays">
+                <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+            <div class="cal-footer">
+                <button class="cal-btn cal-btn-cancel" onclick="closeCalendar(false)">キャンセル</button>
+                <button class="cal-btn cal-btn-ok" onclick="closeCalendar(true)">決定</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -546,6 +663,12 @@
 
         let currentYM = "";
         let shifts = [];
+
+        // 自作カレンダー用状態
+        let activeShiftIdx = null;
+        let tempSelectedDate = "";
+        let calYear = 2026;
+        let calMonth = 11;
 
         function getStorageKey() {
             return `shift_app_data_${currentYM}`;
@@ -646,38 +769,96 @@
             renderAll();
         }
 
-        function handleDateFocus(inputElement) {
-            // 未選択時にカレンダーを開いた際、表示中の「月」の1日を初期フォーカスに設定（自動決定は防ぐ）
-            if (!inputElement.value && currentYM) {
-                inputElement.value = `${currentYM}-01`;
+        // --- 自作カレンダーの制御 ---
+        function openCalendar(idx) {
+            activeShiftIdx = idx;
+            const currentVal = shifts[idx].date;
+            tempSelectedDate = currentVal;
+
+            if (currentVal) {
+                const [y, m] = currentVal.split('-').map(Number);
+                calYear = y;
+                calMonth = m;
+            } else {
+                const [y, m] = currentYM.split('-').map(Number);
+                calYear = y;
+                calMonth = m;
             }
+
+            renderCalendarGrid();
+            document.getElementById('calModal').classList.add('show');
+        }
+
+        function changeCalMonth(diff) {
+            calMonth += diff;
+            if (calMonth > 12) {
+                calMonth = 1;
+                calYear++;
+            } else if (calMonth < 1) {
+                calMonth = 12;
+                calYear--;
+            }
+            renderCalendarGrid();
+        }
+
+        function renderCalendarGrid() {
+            document.getElementById('calTitle').textContent = `${calYear}年${calMonth}月`;
+            const grid = document.getElementById('calGrid');
+            grid.innerHTML = '';
+
+            const firstDayIndex = new Date(calYear, calMonth - 1, 1).getDay();
+            const lastDate = new Date(calYear, calMonth, 0).getDate();
+            const holidays = getHolidaysOfYear(calYear);
+
+            // 空白セル
+            for (let i = 0; i < firstDayIndex; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cal-day empty';
+                grid.appendChild(cell);
+            }
+
+            // 日付セル
+            for (let d = 1; d <= lastDate; d++) {
+                const mStr = String(calMonth).padStart(2, '0');
+                const dStr = String(d).padStart(2, '0');
+                const dateStr = `${calYear}-${mStr}-${dStr}`;
+
+                const cell = document.createElement('div');
+                cell.className = 'cal-day';
+                cell.textContent = d;
+
+                const dt = new Date(calYear, calMonth - 1, d);
+                const dayOfWeek = dt.getDay();
+                if (dayOfWeek === 0) cell.classList.add('sun');
+                if (dayOfWeek === 6) cell.classList.add('sat');
+                if (holidays.has(dateStr)) cell.classList.add('holiday');
+
+                if (tempSelectedDate === dateStr) {
+                    cell.classList.add('selected');
+                }
+
+                cell.onclick = () => {
+                    tempSelectedDate = dateStr;
+                    renderCalendarGrid();
+                };
+
+                grid.appendChild(cell);
+            }
+        }
+
+        function closeCalendar(isConfirm) {
+            if (isConfirm && activeShiftIdx !== null && tempSelectedDate) {
+                shifts[activeShiftIdx].date = tempSelectedDate;
+                saveToStorage();
+                renderAll();
+            }
+            document.getElementById('calModal').classList.remove('show');
+            activeShiftIdx = null;
         }
 
         function updateValue(idx, field, val, element) {
             shifts[idx][field] = val;
             saveToStorage();
-
-            if (field === 'date') {
-                const dummyBtn = element.previousElementSibling;
-                if (val) {
-                    const [y, m, d] = val.split('-');
-                    dummyBtn.textContent = `${y}/${m}/${d}`;
-                    dummyBtn.className = "date-dummy-btn";
-                } else {
-                    dummyBtn.textContent = "選択してください";
-                    dummyBtn.className = "date-dummy-btn empty";
-                    element.value = "";
-                }
-                
-                const card = element.closest('.shift-card');
-                const info = getDayInfo(val);
-                const badgeWrap = card.querySelector('.badges');
-                badgeWrap.innerHTML = `
-                    ${info.badge ? `<span class="badge badge-${info.badge}">${info.badge}</span>` : ''}
-                    ${info.label ? `<span class="card-index" style="margin-left:4px;">${info.label}</span>` : ''}
-                `;
-            }
-
             updateCardSubtotal(idx);
             updateSummary();
         }
@@ -750,10 +931,7 @@
 
                         <div class="field-group">
                             <label class="field-label">勤務日</label>
-                            <div class="date-picker-box">
-                                <div class="${dateBtnClass}">${dateBtnText}</div>
-                                <input type="date" class="date-native-input" value="${shift.date || ''}" onfocus="handleDateFocus(this)" onchange="updateValue(${idx}, 'date', this.value, this); this.blur();">
-                            </div>
+                            <div class="${dateBtnClass}" onclick="openCalendar(${idx})">${dateBtnText}</div>
                         </div>
 
                         <div class="field-group">
