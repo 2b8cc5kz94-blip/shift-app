@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>シフト給与計算</title>
+    
+    <!-- PWA / iOS ホーム画面追加対応の設定 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="シフト給与">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230284c7%22/><text x=%2250%%22 y=%2255%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-size=%2250%22>🕒</text></svg>">
+    
+    <!-- Web App Manifest (単一ファイル内包) -->
+    <link rel="manifest" href='data:application/manifest+json,{
+        "name": "シフト給与計算",
+        "short_name": "シフト給与",
+        "start_url": "./",
+        "display": "standalone",
+        "background_color": "#0b131e",
+        "theme_color": "#151d2a",
+        "icons": [
+            {
+                "src": "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230284c7%22/><text x=%2250%%22 y=%2255%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-size=%2250%22>🕒</text></svg>",
+                "sizes": "any",
+                "type": "image/svg+xml"
+            }
+        ]
+    }'>
+
+    <style>
+        :root {
+            --bg-dark: #0b131e;
+            --header-dark: #151d2a;
+            --card-bg: #ffffff;
+            --card-text: #0f172a;
+            --text-light: #ffffff;
+            --text-muted: #94a3b8;
+            --accent-green: #10b981;
+            --accent-blue: #0284c7;
+            --danger-red: #ef4444;
+            --border-color: #273549;
+            --badge-bg: #fef08a;
+            --badge-text: #854d0e;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            padding-bottom: 120px;
+        }
+
+        header {
+            background-color: var(--header-dark);
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .month-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .nav-btn {
+            background-color: #202b3c;
+            color: #ffffff;
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .month-display-wrap {
+            position: relative;
+        }
+
+        .month-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: #38bdf8;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        .month-input-hidden {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .backup-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .backup-btn {
+            flex: 1;
+            background-color: #1e293b;
+            color: #94a3b8;
+            border: 1px solid var(--border-color);
+            padding: 6px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            background-color: #1e293b;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 8px;
+            text-align: center;
+        }
+
+        .summary-item:not(:last-child) {
+            border-right: 1px solid var(--border-color);
+        }
+
+        .summary-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .summary-val {
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .val-salary {
+            color: var(--accent-green);
+        }
+
+        main {
+            padding: 16px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .section-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .shift-card {
+            background-color: var(--card-bg);
+            color: var(--card-text);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .card-index {
+            font-size: 13px;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+
+        .badges {
+            display: inline-flex;
+            gap: 6px;
+            margin-left: 6px;
+        }
+
+        .badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+
+        .badge-平日 { background-color: #e2e8f0; color: #475569; }
+        .badge-土日祝 { background-color: #fef08a; color: #854d0e; }
+
+        .btn-delete {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 2px 6px;
+        }
+
+        .field-group {
+            margin-bottom: 12px;
+        }
+
+        .field-label {
+            font-size: 11px;
+            color: #64748b;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .date-picker-box {
+            position: relative;
+            width: 100%;
+        }
+
+        .date-dummy-btn {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+
+        .date-dummy-btn.empty {
+            color: #94a3b8;
+            font-weight: 400;
+        }
+
+        .date-native-input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .time-select-grid {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .time-box {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            background-color: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 0 4px;
+        }
+
+        .time-box select {
+            flex: 1;
+            padding: 10px 0;
+            font-size: 15px;
+            font-weight: 600;
+            border: none;
+            background: transparent;
+            color: #0f172a;
+            text-align: center;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        .time-box span {
+            font-size: 12px;
+            color: #64748b;
+            padding-right: 4px;
+        }
+
+        .time-sep {
+            color: #64748b;
+            padding: 0 2px;
+        }
+
+        .card-subtotal {
+            background-color: #f8fafc;
+            border-radius: 10px;
+            padding: 10px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+        }
+
+        .sub-title {
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        .sub-val {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .sub-val-salary {
+            color: var(--accent-green);
+        }
+
+        .bottom-action-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid var(--border-color);
+            padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+            display: flex;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        .btn-action {
+            width: 100%;
+            max-width: 600px;
+            border: none;
+            border-radius: 12px;
+            padding: 14px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .btn-add {
+            background-color: var(--accent-blue);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+        }
+
+        .guide-box {
+            background-color: #1e293b;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-top: 24px;
+            overflow: hidden;
+        }
+
+        .guide-header {
+            padding: 12px 16px;
+            font-size: 13px;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .guide-body {
+            padding: 16px;
+            border-top: 1px solid var(--border-color);
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            display: none;
+        }
+
+        .guide-body.show {
+            display: block;
+        }
+
+        .empty-text {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 32px 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="month-header">
+            <button class="nav-btn" id="prevMonthBtn">‹ 前月</button>
+            <div class="month-display-wrap">
+                <div class="month-title" id="monthText">----年--月 📅</div>
+                <input type="month" class="month-input-hidden" id="monthPicker">
+            </div>
+            <button class="nav-btn" id="nextMonthBtn">翌月 ›</button>
+        </div>
+
+        <div class="backup-bar">
+            <button class="backup-btn" onclick="exportData()">💾 バックアップ保存</button>
+            <button class="backup-btn" onclick="document.getElementById('importFile').click()">📂 復元</button>
+            <input type="file" id="importFile" style="display:none" accept=".json" onchange="importData(event)">
+        </div>
+
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-label">月間合計給与</div>
+                <div class="summary-val val-salary" id="totalSalary">¥0</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label">合計勤務時間</div>
+                <div class="summary-val" id="totalHours">0時間0分</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label">シフト件数</div>
+                <div class="summary-val" id="totalCount">0件</div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="section-bar">
+            <span>🕒 シフト一覧</span>
+        </div>
+
+        <div id="shiftContainer"></div>
+
+        <div class="guide-box">
+            <div class="guide-header" onclick="toggleGuide()">
+                <span>ⓘ 時給ルール・算出仕様</span>
+                <span id="guideArrow">⌵</span>
+            </div>
+            <div class="guide-body" id="guideContent">
+                ・平日：8:00〜9:00（1,350円） / 9:00〜17:00（1,080円） / 17:00以降（1,350円）<br>
+                ・土日祝：全時間帯一律 1,350円<br>
+                ・時間帯を跨ぐシフトは自動分割されて計算されます。
+            </div>
+        </div>
+    </main>
+
+    <div class="bottom-action-bar">
+        <button class="btn-action btn-add" id="addBtn">＋ シフトを追加</button>
+    </div>
+
+    <script>
+        // 祝日計算
+        function getVernalEquinoxDay(y) {
+            if (y <= 1979) return Math.floor(20.8357 + 0.242194 * (y - 1980) - Math.floor((y - 1983) / 4));
+            return Math.floor(20.8431 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4));
+        }
+
+        function getAutumnalEquinoxDay(y) {
+            if (y <= 1979) return Math.floor(23.2588 + 0.242194 * (y - 1980) - Math.floor((y - 1983) / 4));
+            return Math.floor(23.2488 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4));
+        }
+
+        function getNthMonday(y, m, n) {
+            let count = 0;
+            for (let d = 1; d <= 31; d++) {
+                const date = new Date(y, m - 1, d);
+                if (date.getMonth() + 1 !== m) break;
+                if (date.getDay() === 1) {
+                    count++;
+                    if (count === n) return d;
+                }
+            }
+            return 0;
+        }
+
+        function getHolidaysOfYear(y) {
+            const set = new Set();
+            const add = (m, d) => set.add(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+
+            add(1, 1); add(2, 11); add(2, 23); add(4, 29); add(5, 3); add(5, 4); add(5, 5); add(8, 11); add(11, 3); add(11, 23);
+            add(1, getNthMonday(y, 1, 2)); add(7, getNthMonday(y, 7, 3)); add(9, getNthMonday(y, 9, 3)); add(10, getNthMonday(y, 10, 2));
+            add(3, getVernalEquinoxDay(y)); add(9, getAutumnalEquinoxDay(y));
+
+            const sorted = Array.from(set).sort();
+            const full = new Set(set);
+            sorted.forEach(dStr => {
+                const [year, month, day] = dStr.split('-').map(Number);
+                const dt = new Date(year, month - 1, day);
+                if (dt.getDay() === 0) {
+                    let sub = new Date(dt);
+                    while (true) {
+                        sub.setDate(sub.getDate() + 1);
+                        const sStr = `${sub.getFullYear()}-${String(sub.getMonth() + 1).padStart(2, '0')}-${String(sub.getDate()).padStart(2, '0')}`;
+                        if (!full.has(sStr)) { full.add(sStr); break; }
+                    }
+                }
+            });
+            return full;
+        }
+
+        function getDayInfo(dateStr) {
+            if (!dateStr) return { label: '日付未選択', badge: '', category: 'unknown' };
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const dt = new Date(y, m - 1, d);
+            const dayNames = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
+            const dayName = dayNames[dt.getDay()];
+            const holidays = getHolidaysOfYear(y);
+
+            if (holidays.has(dateStr) || dt.getDay() === 0 || dt.getDay() === 6) {
+                const label = holidays.has(dateStr) ? '祝日' : dayName;
+                return { label: label, badge: '土日祝', category: 'weekend' };
+            }
+            return { label: dayName, badge: '平日', category: 'weekday' };
+        }
+
+        function calcSalary(dateStr, startH, startM, endH, endM) {
+            if (!dateStr || startH === "" || startM === "" || endH === "" || endM === "") {
+                return { salary: 0, minutes: 0 };
+            }
+            const startTotal = Number(startH) * 60 + Number(startM);
+            const endTotal = Number(endH) * 60 + Number(endM);
+            if (endTotal <= startTotal) return { salary: 0, minutes: 0 };
+
+            const totalMinutes = endTotal - startTotal;
+            const info = getDayInfo(dateStr);
+
+            if (info.category === 'weekend') {
+                return { salary: Math.round((totalMinutes / 60) * 1350), minutes: totalMinutes };
+            }
+
+            let salary = 0;
+            for (let m = startTotal; m < endTotal; m += 5) {
+                let rate = (m >= 540 && m < 1020) ? 1080 : 1350;
+                salary += (rate / 60) * 5;
+            }
+            return { salary: Math.round(salary), minutes: totalMinutes };
+        }
+
+        let currentYM = "";
+        let shifts = [];
+
+        function getStorageKey() {
+            return `shift_app_data_${currentYM}`;
+        }
+
+        function saveToStorage() {
+            try {
+                localStorage.setItem(getStorageKey(), JSON.stringify(shifts));
+            } catch(e) {}
+        }
+
+        function loadFromStorage() {
+            try {
+                const saved = localStorage.getItem(getStorageKey());
+                return saved ? JSON.parse(saved) : [];
+            } catch(e) {
+                return [];
+            }
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(shifts));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `shift_backup_${currentYM}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function importData(event) {
+            const fileReader = new FileReader();
+            if (event.target.files[0]) {
+                fileReader.readAsText(event.target.files[0], "UTF-8");
+                fileReader.onload = (e) => {
+                    try {
+                        const imported = JSON.parse(e.target.result);
+                        if (Array.isArray(imported)) {
+                            shifts = imported;
+                            saveToStorage();
+                            renderAll();
+                            alert("データを正常に復元しました！");
+                        }
+                    } catch (err) {
+                        alert("ファイルの読み込みに失敗しました。");
+                    }
+                };
+            }
+        }
+
+        function initApp() {
+            const today = new Date();
+            const y = today.getFullYear();
+            const m = String(today.getMonth() + 1).padStart(2, '0');
+            currentYM = `${y}-${m}`;
+
+            document.getElementById('prevMonthBtn').onclick = () => changeMonth(-1);
+            document.getElementById('nextMonthBtn').onclick = () => changeMonth(1);
+            document.getElementById('monthPicker').onchange = (e) => {
+                if (e.target.value) {
+                    currentYM = e.target.value;
+                    loadShifts();
+                }
+            };
+            document.getElementById('addBtn').onclick = addShift;
+
+            window.addEventListener('pagehide', saveToStorage);
+            window.addEventListener('blur', saveToStorage);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'hidden') saveToStorage();
+            });
+
+            loadShifts();
+        }
+
+        function loadShifts() {
+            const [y, m] = currentYM.split('-');
+            document.getElementById('monthText').textContent = `${y}年${parseInt(m, 10)}月 📅`;
+            document.getElementById('monthPicker').value = currentYM;
+
+            shifts = loadFromStorage();
+            renderAll();
+        }
+
+        function addShift() {
+            shifts.push({
+                date: "",
+                startH: "", startM: "",
+                endH: "", endM: ""
+            });
+            saveToStorage();
+            renderAll();
+        }
+
+        function deleteShift(idx) {
+            shifts.splice(idx, 1);
+            saveToStorage();
+            renderAll();
+        }
+
+        function updateValue(idx, field, val, element) {
+            shifts[idx][field] = val;
+            saveToStorage();
+
+            if (field === 'date') {
+                const dummyBtn = element.previousElementSibling;
+                if (val) {
+                    const [y, m, d] = val.split('-');
+                    dummyBtn.textContent = `${y}/${m}/${d}`;
+                    dummyBtn.className = "date-dummy-btn";
+                } else {
+                    dummyBtn.textContent = "選択してください";
+                    dummyBtn.className = "date-dummy-btn empty";
+                }
+                
+                const card = element.closest('.shift-card');
+                const info = getDayInfo(val);
+                const badgeWrap = card.querySelector('.badges');
+                badgeWrap.innerHTML = `
+                    ${info.badge ? `<span class="badge badge-${info.badge}">${info.badge}</span>` : ''}
+                    ${info.label ? `<span class="card-index" style="margin-left:4px;">${info.label}</span>` : ''}
+                `;
+            }
+
+            updateCardSubtotal(idx);
+            updateSummary();
+        }
+
+        function updateCardSubtotal(idx) {
+            const shift = shifts[idx];
+            const res = calcSalary(shift.date, shift.startH, shift.startM, shift.endH, shift.endM);
+            const container = document.getElementById('shiftContainer');
+            const card = container.children[idx];
+            if (!card) return;
+
+            const timeSpan = card.querySelector('.sub-val-time');
+            const salarySpan = card.querySelector('.sub-val-salary');
+
+            if (timeSpan) timeSpan.textContent = `${Math.floor(res.minutes / 60)}時間${res.minutes % 60}分`;
+            if (salarySpan) salarySpan.textContent = `¥${res.salary.toLocaleString()}`;
+        }
+
+        function updateSummary() {
+            let totalSalary = 0;
+            let totalMinutes = 0;
+            let validCount = 0;
+
+            shifts.forEach(shift => {
+                const res = calcSalary(shift.date, shift.startH, shift.startM, shift.endH, shift.endM);
+                if (res.minutes > 0) {
+                    totalSalary += res.salary;
+                    totalMinutes += res.minutes;
+                    validCount++;
+                }
+            });
+
+            document.getElementById('totalSalary').textContent = `¥${totalSalary.toLocaleString()}`;
+            document.getElementById('totalHours').textContent = `${Math.floor(totalMinutes / 60)}時間${totalMinutes % 60}分`;
+            document.getElementById('totalCount').textContent = `${validCount}件`;
+        }
+
+        function renderAll() {
+            const container = document.getElementById('shiftContainer');
+            container.innerHTML = '';
+
+            if (shifts.length === 0) {
+                container.innerHTML = `<div class="empty-text">シフトがありません。<br>「＋ シフトを追加」ボタンを押してください。</div>`;
+            } else {
+                shifts.forEach((shift, idx) => {
+                    const info = getDayInfo(shift.date);
+                    const res = calcSalary(shift.date, shift.startH, shift.startM, shift.endH, shift.endM);
+
+                    let dateBtnText = "選択してください";
+                    let dateBtnClass = "date-dummy-btn empty";
+                    if (shift.date) {
+                        const [y, m, d] = shift.date.split('-');
+                        dateBtnText = `${y}/${m}/${d}`;
+                        dateBtnClass = "date-dummy-btn";
+                    }
+
+                    const card = document.createElement('div');
+                    card.className = 'shift-card';
+                    card.innerHTML = `
+                        <div class="card-top">
+                            <div>
+                                <span class="card-index">#${idx + 1}</span>
+                                <span class="badges">
+                                    ${info.badge ? `<span class="badge badge-${info.badge}">${info.badge}</span>` : ''}
+                                    ${info.label ? `<span class="card-index" style="margin-left:4px;">${info.label}</span>` : ''}
+                                </span>
+                            </div>
+                            <button class="btn-delete" onclick="deleteShift(${idx})">🗑️</button>
+                        </div>
+
+                        <div class="field-group">
+                            <label class="field-label">勤務日</label>
+                            <div class="date-picker-box">
+                                <div class="${dateBtnClass}">${dateBtnText}</div>
+                                <input type="date" class="date-native-input" value="${shift.date || ''}" oninput="updateValue(${idx}, 'date', this.value, this); this.blur();" onchange="updateValue(${idx}, 'date', this.value, this); this.blur();">
+                            </div>
+                        </div>
+
+                        <div class="field-group">
+                            <div style="display:flex; justify-content:space-between;">
+                                <label class="field-label">開始時間</label>
+                                <label class="field-label" style="margin-right:45%;">終了時間</label>
+                            </div>
+                            <div class="time-select-grid">
+                                <div class="time-box">
+                                    <select oninput="updateValue(${idx}, 'startH', this.value, this); this.blur();" onchange="updateValue(${idx}, 'startH', this.value, this); this.blur();">${genOptions(23, shift.startH)}</select>
+                                    <span>時</span>
+                                </div>
+                                <div class="time-box">
+                                    <select oninput="updateValue(${idx}, 'startM', this.value, this); this.blur();" onchange="updateValue(${idx}, 'startM', this.value, this); this.blur();">${genOptions(55, shift.startM, 5)}</select>
+                                    <span>分</span>
+                                </div>
+                                <span class="time-sep">〜</span>
+                                <div class="time-box">
+                                    <select oninput="updateValue(${idx}, 'endH', this.value, this); this.blur();" onchange="updateValue(${idx}, 'endH', this.value, this); this.blur();">${genOptions(23, shift.endH)}</select>
+                                    <span>時</span>
+                                </div>
+                                <div class="time-box">
+                                    <select oninput="updateValue(${idx}, 'endM', this.value, this); this.blur();" onchange="updateValue(${idx}, 'endM', this.value, this); this.blur();">${genOptions(55, shift.endM, 5)}</select>
+                                    <span>分</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-subtotal">
+                            <div>
+                                <span class="sub-title">小計時間</span><br>
+                                <span class="sub-val sub-val-time">${Math.floor(res.minutes / 60)}時間${res.minutes % 60}分</span>
+                            </div>
+                            <div style="text-align:right;">
+                                <span class="sub-title">小計給与</span><br>
+                                <span class="sub-val sub-val-salary">¥${res.salary.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+
+            updateSummary();
+        }
+
+        function genOptions(max, selectedVal, step = 1) {
+            let html = `<option value="" ${selectedVal === "" ? 'selected' : ''}>--</option>`;
+            for (let i = 0; i <= max; i += step) {
+                const valStr = String(i).padStart(2, '0');
+                const isSel = String(selectedVal) === valStr ? 'selected' : '';
+                html += `<option value="${valStr}" ${isSel}>${i}</option>`;
+            }
+            return html;
+        }
+
+        function changeMonth(diff) {
+            const [y, m] = currentYM.split('-').map(Number);
+            const dt = new Date(y, m - 1 + diff, 1);
+            const newY = dt.getFullYear();
+            const newM = String(dt.getMonth() + 1).padStart(2, '0');
+            currentYM = `${newY}-${newM}`;
+            loadShifts();
+        }
+
+        function toggleGuide() {
+            const g = document.getElementById('guideContent');
+            const a = document.getElementById('guideArrow');
+            if (g.classList.contains('show')) {
+                g.classList.remove('show');
+                a.textContent = '⌵';
+            } else {
+                g.classList.add('show');
+                a.textContent = '⌃';
+            }
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
